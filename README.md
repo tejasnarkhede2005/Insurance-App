@@ -6,7 +6,7 @@ live link : https://insurance-app-by-tejas.streamlit.app/
 
 
 
-```mermaid
+``` mermaid
 
 graph TD
     A[Start Application] --> B{Load ML Model ('insurance.pkl')};
