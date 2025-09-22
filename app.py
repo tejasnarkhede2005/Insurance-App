@@ -35,8 +35,15 @@ header {visibility: hidden;}
 div[data-testid="stNumberInput"] input,
 div[data-testid="stSelectbox"] div[data-baseweb="select"] {
     background-color: #ffffff;
+    color: #333333; /* <-- FIX: Sets text color to dark grey */
     border-radius: 5px;
 }
+
+/* Make sure the text inside the number input is also dark */
+div[data-testid="stNumberInput"] input {
+    color: #333333;
+}
+
 
 /* Styling for the prediction button */
 div[data-testid="stButton"] > button {
@@ -63,6 +70,7 @@ div[data-testid="stButton"] > button:hover {
     border-radius: 8px;
     margin-top: 20px;
     font-size: 1.2rem;
+    color: #333; /* Ensure text in result box is also dark */
 }
 """
 
