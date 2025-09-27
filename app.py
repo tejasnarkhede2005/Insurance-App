@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import pickle
+from forex_python.converter import CurrencyRates
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
@@ -72,7 +73,6 @@ div[data-testid="stButton"] > button:hover {
 }
 """
 
-# --- INJECT CSS INTO THE APP ---
 st.markdown(f'<style>{CSS_CODE}</style>', unsafe_allow_html=True)
 
 # --- LOAD THE MODEL ---
@@ -90,14 +90,23 @@ except Exception as e:
 st.sidebar.title("Navigation")
 page = st.sidebar.radio("Go to", ["Home", "About", "Contact"])
 
+# Helper function to get USD -> INR rate
+def get_usd_to_inr_rate():
+    try:
+        cr = CurrencyRates()
+        rate = cr.get_rate('USD', 'INR')  # get conversion rate from USD to INR :contentReference[oaicite:0]{index=0}
+        return rate
+    except Exception as e:
+        st.warning(f"Could not fetch live exchange rate: {e}")
+        return None
+
 # ===================================
 # --- HOME PAGE ---
 # ===================================
 if page == "Home":
     st.title("Insurance Premium Predictor")
-    st.write("Enter the details below to get an estimate of your insurance premium.")
+    st.write("Enter the details below to get an estimate of your insurance premium (converted to INR).")
 
-    # --- USER INPUT FORM ---
     with st.form("prediction_form"):
         col1, col2 = st.columns(2)
 
@@ -110,7 +119,6 @@ if page == "Home":
 
         submitted = st.form_submit_button("Predict Premium")
 
-    # --- PREDICTION LOGIC ---
     if submitted:
         smoker_yes = 1 if smoker_option == "Yes" else 0
         input_data = pd.DataFrame({
@@ -120,16 +128,37 @@ if page == "Home":
         })
 
         try:
-            prediction = model.predict(input_data)[0]
-            st.markdown("### Prediction Result")
-            st.markdown(
-                f'''
-                <div class="result-box">
-                    The estimated annual insurance charge is: <strong>₹{prediction:,.2f}</strong>
-                </div>
-                ''',
-                unsafe_allow_html=True
-            )
+            # Predict in USD (assuming your model was trained on USD values)
+            prediction_usd = model.predict(input_data)[0]
+
+            # Fetch live exchange rate
+            usd_to_inr = get_usd_to_inr_rate()
+
+            if usd_to_inr is not None:
+                prediction_inr = prediction_usd * usd_to_inr
+                st.markdown("### Prediction Result")
+                st.markdown(
+                    f'''
+                    <div class="result-box">
+                        Estimated annual insurance charge: <strong>₹{prediction_inr:,.2f}</strong><br>
+                        (approx based on USD value of ${prediction_usd:,.2f} and exchange rate ₹{usd_to_inr:.2f}/USD)
+                    </div>
+                    ''',
+                    unsafe_allow_html=True
+                )
+            else:
+                # Fallback: show USD if rate fetch failed
+                st.markdown("### Prediction Result")
+                st.markdown(
+                    f'''
+                    <div class="result-box">
+                        Estimated annual insurance charge (USD): <strong>${prediction_usd:,.2f}</strong><br>
+                        <em>Could not convert to INR (exchange rate unavailable)</em>
+                    </div>
+                    ''',
+                    unsafe_allow_html=True
+                )
+
         except Exception as e:
             st.error(f"An error occurred during prediction: {e}")
 
@@ -142,23 +171,16 @@ if page == "Home":
 elif page == "About":
     st.title("About InsurePredict")
     st.image("https://images.unsplash.com/photo-1579621970795-87f54d5921ba?w=500", caption="Data-driven decisions in healthcare.")
-
     st.markdown("""
     ### The Project
-    **InsurePredict** is a web application designed to demonstrate the power of machine learning in the insurance industry. By inputting key health metrics such as age, BMI, and smoking status, users can receive an instant estimate of their potential annual insurance premiums.
+    **InsurePredict** is a web application designed to demonstrate machine learning in the insurance domain. By inputting health features such as age, BMI, and smoking status, users get an instant estimate of their potential annual insurance premium in Indian Rupees.
 
-    ### The Model
-    The prediction engine is powered by a **Linear Regression** model, trained on a public dataset containing insurance information. The model learns the relationship between the input features and the final insurance charge.
+    ### The Model & Conversion
+    - The model is trained (or expects) values in USD.
+    - The app fetches the live USD → INR exchange rate using `forex-python` and converts the predicted USD value to INR.
+    - If exchange rate fetch fails, the app falls back to showing the USD prediction.
 
-    **Key Features Used by the Model:**
-    - **Age**
-    - **BMI (Body Mass Index)**
-    - **Smoker Status**
-
-    ### Our Mission
-    Our goal is to make complex data science concepts accessible and understandable. This tool serves as an educational resource to show how data can be leveraged to make predictions.
-
-    **Note:** The predictions generated are for demonstration purposes only and should not be considered a formal insurance quote.
+    **Note:** Predictions are for demonstration; not a formal quote.
     """)
 
 # ===================================
@@ -167,13 +189,11 @@ elif page == "About":
 elif page == "Contact":
     st.title("Get In Touch 📧")
     st.write("We'd love to hear from you! Please fill out the form below.")
-
     with st.form("contact_form"):
         name = st.text_input("Your Name")
         email = st.text_input("Your Email")
         message = st.text_area("Your Message", height=150)
         submitted = st.form_submit_button("Send Message")
-
         if submitted:
             if name and email and message:
                 st.success("Thank you for your message! We will get back to you shortly.")
