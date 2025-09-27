@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import pickle
-from forex_python.converter import CurrencyRates
+import requests
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
@@ -90,12 +90,12 @@ except Exception as e:
 st.sidebar.title("Navigation")
 page = st.sidebar.radio("Go to", ["Home", "About", "Contact"])
 
-# Helper function to get USD -> INR rate
+# --- Helper function to fetch exchange rate ---
 def get_usd_to_inr_rate():
     try:
-        cr = CurrencyRates()
-        rate = cr.get_rate('USD', 'INR')  # get conversion rate from USD to INR :contentReference[oaicite:0]{index=0}
-        return rate
+        response = requests.get("https://api.exchangerate.host/latest?base=USD&symbols=INR")
+        data = response.json()
+        return data["rates"]["INR"]
     except Exception as e:
         st.warning(f"Could not fetch live exchange rate: {e}")
         return None
@@ -128,10 +128,7 @@ if page == "Home":
         })
 
         try:
-            # Predict in USD (assuming your model was trained on USD values)
             prediction_usd = model.predict(input_data)[0]
-
-            # Fetch live exchange rate
             usd_to_inr = get_usd_to_inr_rate()
 
             if usd_to_inr is not None:
@@ -147,7 +144,6 @@ if page == "Home":
                     unsafe_allow_html=True
                 )
             else:
-                # Fallback: show USD if rate fetch failed
                 st.markdown("### Prediction Result")
                 st.markdown(
                     f'''
@@ -177,7 +173,7 @@ elif page == "About":
 
     ### The Model & Conversion
     - The model is trained (or expects) values in USD.
-    - The app fetches the live USD → INR exchange rate using `forex-python` and converts the predicted USD value to INR.
+    - The app fetches the live USD → INR exchange rate from **exchangerate.host** and converts the prediction.
     - If exchange rate fetch fails, the app falls back to showing the USD prediction.
 
     **Note:** Predictions are for demonstration; not a formal quote.
